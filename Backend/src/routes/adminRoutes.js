@@ -4,6 +4,7 @@ const {
   loginAdmin,
   refreshToken,
   logoutAdmin,
+  getDashboardStats,
   getGroups,
   createGroup,
   updateGroup,
@@ -23,6 +24,9 @@ const { protect } = require('../middleware/authMiddleware');
 router.post('/auth/login', loginAdmin);
 router.post('/auth/refresh', refreshToken);
 router.post('/auth/logout', logoutAdmin);
+
+// Dashboard statistikasi
+router.get('/admin/dashboard/stats', protect, getDashboardStats);
 
 // Himoyalangan Admin yo'llari (Guruhlar)
 router.get('/admin/groups', protect, getGroups);

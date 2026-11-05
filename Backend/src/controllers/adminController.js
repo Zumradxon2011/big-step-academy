@@ -72,6 +72,38 @@ const logoutAdmin = (req, res) => {
   res.json({ message: 'Tizimdan muvaffaqiyatli chiqildi' });
 };
 
+// Dashboard statistikasini olish
+const getDashboardStats = async (req, res) => {
+  try {
+    const [
+      totalActiveStudents,
+      totalArchivedStudents,
+      totalGroups,
+      recentGroups,
+      recentStudents,
+    ] = await Promise.all([
+      Student.countDocuments({ status: 'active' }),
+      Student.countDocuments({ status: 'archived' }),
+      Group.countDocuments(),
+      Group.find().sort({ createdAt: -1 }).limit(5),
+      Student.find({ status: 'active' })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate('groupId', 'name subject'),
+    ]);
+
+    res.json({
+      totalActiveStudents,
+      totalArchivedStudents,
+      totalGroups,
+      recentGroups,
+      recentStudents,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Guruhlarni olish
 const getGroups = async (req, res) => {
   try {
@@ -206,6 +238,7 @@ module.exports = {
   loginAdmin,
   refreshToken,
   logoutAdmin,
+  getDashboardStats,
   getGroups,
   createGroup,
   updateGroup,

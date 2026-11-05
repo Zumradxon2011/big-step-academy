@@ -45,4 +45,6 @@ export interface DashboardStats {
   totalArchivedStudents: number;
   totalGroups: number;
   todayAttendancePercent?: number;
+  recentGroups?: Group[];
+  recentStudents?: Student[];
 }
