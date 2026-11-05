@@ -20,7 +20,6 @@ import {
   MapPin,
   Check,
   X,
-  Lock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -104,7 +103,7 @@ function AttendanceContent() {
     Record<string, Record<number, 'present' | 'absent'>>
   >({});
 
-  // Interaktiv Popover holati
+  // Interaktiv Popover holati (Yashil - Bor va Qizil - Yo'q tanlash)
   const [popoverState, setPopoverState] = useState<PopoverState | null>(null);
 
   // Yuklanish holatlari
@@ -163,35 +162,6 @@ function AttendanceContent() {
       return groupLessonWeekdays.includes(d.getDay());
     });
   }, [allDaysArray, selectedYear, selectedMonth, groupLessonWeekdays]);
-
-  // Ketma-ketlik qoidasi: Agar biror dars kuni davomat qilinmasa, keyingi barcha darslar yopiq (Y) bo'ladi
-  const lockedDaysSet = useMemo(() => {
-    const locked = new Set<number>();
-    if (students.length === 0 || groupLessonDaysInMonth.length === 0) {
-      return locked;
-    }
-
-    let previousDayCompleted = true;
-    for (let i = 0; i < groupLessonDaysInMonth.length; i++) {
-      const day = groupLessonDaysInMonth[i];
-      if (!previousDayCompleted) {
-        // Oldingi dars yakunlanmagan bo'lsa, ushbu va keyingi barcha darslar qulflanadi
-        locked.add(day);
-      } else {
-        // Dars yakunlangan deb hisoblanishi uchun guruhdagi har bir faol o'quvchiga davomat (Bor yoki Yo'q) qo'yilgan bo'lishi kerak
-        const isCompleted = students.every((s) => {
-          const st = attendanceMap[s._id]?.[day];
-          return st === 'present' || st === 'absent';
-        });
-
-        if (!isCompleted) {
-          previousDayCompleted = false;
-        }
-      }
-    }
-
-    return locked;
-  }, [students, groupLessonDaysInMonth, attendanceMap]);
 
   // Jadvalda ko'rsatiladigan kunlar ro'yxati (filtrlangan yoki barchasi)
   const displayedDaysArray = useMemo(() => {
@@ -342,16 +312,9 @@ function AttendanceContent() {
     setHasChanges(true);
   };
 
-  // Muayan ochiq kun uchun barcha o'quvchilarga "Bor" belgilash
+  // Muayan dars kuni uchun barcha o'quvchilarga "Bor" belgilash
   const handleMarkAllPresentForDay = (day: number) => {
     if (students.length === 0) return;
-
-    if (lockedDaysSet.has(day)) {
-      toast.error('Ushbu dars yopiq! Avval oldingi dars davomatini to\'liq to\'ldiring.', {
-        icon: '🔒',
-      });
-      return;
-    }
 
     setAttendanceMap((prev) => {
       const updated = { ...prev };
@@ -368,21 +331,13 @@ function AttendanceContent() {
     toast.success(`${day}-sana uchun barchaga "Bor" belgilandi`);
   };
 
-  // Katakcha bosilganda
+  // Katakcha bosilganda Popover ochish
   const handleCellClick = (
     e: React.MouseEvent<HTMLButtonElement>,
     student: Student,
-    day: number,
-    isLocked: boolean
+    day: number
   ) => {
     e.stopPropagation();
-
-    if (isLocked) {
-      toast.error('Ushbu dars yopiq (Y)! Avval oldingi dars davomatini to\'liq to\'ldiring.', {
-        icon: '🔒',
-      });
-      return;
-    }
 
     const rect = e.currentTarget.getBoundingClientRect();
     setPopoverState({
@@ -425,7 +380,7 @@ function AttendanceContent() {
             <span>Davomat Jurnali</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Guruh darslaridagi qatnashuvni belgilang. Ketma-ketlik va avtomatik saqlash faol.
+            Guruh darslaridagi qatnashuvni belgilang. Tezkor tanlov va avtomatik saqlash faol.
           </p>
         </div>
 
@@ -535,7 +490,7 @@ function AttendanceContent() {
             </span>
           </div>
 
-          {/* Dars kunlari filtri va Yangi Legend */}
+          {/* Dars kunlari filtri va Belgilar Legend */}
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
             {/* Faqat dars kunlari Toggle tugmasi */}
             <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs">
@@ -563,7 +518,7 @@ function AttendanceContent() {
               </button>
             </div>
 
-            {/* Belgilar tushuntirishi (Yashil, Qizil, Siyohrang Yopiq) */}
+            {/* Belgilar tushuntirishi (Faqat Yashil Bor va Qizil Yo'q) */}
             <div className="flex items-center gap-3 text-xs bg-white px-3.5 py-2 rounded-2xl border border-slate-200/80 shadow-2xs">
               <div className="flex items-center gap-1.5">
                 <span className="w-5 h-5 rounded-lg bg-emerald-500 text-white font-bold flex items-center justify-center text-xs shadow-xs shadow-emerald-500/30">
@@ -578,16 +533,10 @@ function AttendanceContent() {
                 <span className="text-slate-700 font-semibold">Yo&apos;q</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-lg bg-purple-600 text-white font-black flex items-center justify-center text-xs shadow-xs shadow-purple-600/30">
-                  Y
-                </span>
-                <span className="text-slate-700 font-semibold">Yopiq</span>
-              </div>
-              <div className="flex items-center gap-1.5">
                 <span className="w-5 h-5 rounded-lg border-2 border-dashed border-slate-300 text-slate-400 font-black flex items-center justify-center text-xs">
                   +
                 </span>
-                <span className="text-slate-500 font-medium">Ochiq</span>
+                <span className="text-slate-500 font-medium">Belgilanmagan</span>
               </div>
             </div>
           </div>
@@ -637,15 +586,12 @@ function AttendanceContent() {
                   {/* Ko'rsatiladigan Kunlar */}
                   {displayedDaysArray.map((day) => {
                     const { name, isToday, isWeekend, isLessonDay } = getDayMeta(day);
-                    const isLocked = isLessonDay && lockedDaysSet.has(day);
 
                     return (
                       <th
                         key={day}
                         className={`py-3 px-1.5 text-center font-semibold min-w-[70px] border-r border-slate-100 last:border-r-0 transition-colors ${
-                          isLocked
-                            ? 'bg-purple-50/50 text-purple-900'
-                            : isToday
+                          isToday
                             ? 'bg-blue-100/80 text-[#003b95]'
                             : isLessonDay
                             ? 'bg-amber-50/20 text-slate-700'
@@ -653,17 +599,13 @@ function AttendanceContent() {
                             ? 'bg-slate-100/60 text-slate-400'
                             : 'text-slate-600'
                         }`}
-                        title={`${selectedYear}-${selectedMonth}-${day} (${name})${
-                          isLocked ? ' - Ushbu dars yopiq' : ''
-                        }`}
+                        title={`${selectedYear}-${selectedMonth}-${day} (${name})`}
                       >
                         <div className="flex flex-col items-center justify-center gap-1">
                           {/* Hafta kuni */}
                           <span
                             className={`text-[11px] font-bold tracking-wider uppercase ${
-                              isLocked
-                                ? 'text-purple-600 font-extrabold'
-                                : isToday
+                              isToday
                                 ? 'text-[#003b95]'
                                 : isLessonDay
                                 ? 'text-amber-700 font-extrabold'
@@ -676,9 +618,7 @@ function AttendanceContent() {
                           {/* Sana raqami */}
                           <div
                             className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black transition-all ${
-                              isLocked
-                                ? 'bg-purple-100 text-purple-800'
-                                : isToday
+                              isToday
                                 ? 'bg-[#003b95] text-white shadow-sm shadow-[#003b95]/30'
                                 : isLessonDay
                                 ? 'bg-amber-100 text-amber-950 font-bold'
@@ -688,27 +628,16 @@ function AttendanceContent() {
                             {day < 10 ? `0${day}` : day}
                           </div>
 
-                          {/* Ustun boshqaruv tugmasi / Yopiq belgisi */}
+                          {/* Ustun boshqaruv tugmasi (Barchaga Bor qo'yish) */}
                           {isLessonDay && (
-                            <>
-                              {isLocked ? (
-                                <span
-                                  title="Oldingi dars to'ldirilmagani uchun yopiq"
-                                  className="text-[10px] text-purple-700 bg-purple-100/80 font-extrabold px-1.5 py-0.5 rounded-lg flex items-center gap-0.5 select-none"
-                                >
-                                  <Lock className="w-2.5 h-2.5" /> Yopiq
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleMarkAllPresentForDay(day)}
-                                  title={`${day}-sana uchun barchaga "Bor" qo'yish`}
-                                  className="text-[10px] text-slate-500 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg px-1.5 py-0.5 transition cursor-pointer font-bold border border-slate-200/80 hover:border-emerald-300"
-                                >
-                                  ✓ Barchasi
-                                </button>
-                              )}
-                            </>
+                            <button
+                              type="button"
+                              onClick={() => handleMarkAllPresentForDay(day)}
+                              title={`${day}-sana uchun barchaga "Bor" qo'yish`}
+                              className="text-[10px] text-slate-500 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg px-1.5 py-0.5 transition cursor-pointer font-bold border border-slate-200/80 hover:border-emerald-300"
+                            >
+                              ✓ Barchasi
+                            </button>
                           )}
                         </div>
                       </th>
@@ -767,15 +696,12 @@ function AttendanceContent() {
                       {displayedDaysArray.map((day) => {
                         const status = studentDays[day];
                         const { isToday, isWeekend, isLessonDay } = getDayMeta(day);
-                        const isLocked = isLessonDay && lockedDaysSet.has(day);
 
                         return (
                           <td
                             key={day}
                             className={`py-2 px-1 text-center border-r border-slate-100 last:border-r-0 transition-all ${
-                              isLocked
-                                ? 'bg-purple-50/40'
-                                : isToday
+                              isToday
                                 ? 'bg-blue-50/40 hover:bg-blue-100/60'
                                 : isLessonDay
                                 ? 'bg-amber-50/10 hover:bg-amber-100/40'
@@ -792,19 +718,10 @@ function AttendanceContent() {
                                 >
                                   -
                                 </span>
-                              ) : isLocked ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleCellClick(e, student, day, true)}
-                                  title="Dars yopiq (Y). Oldingi dars davomati to'liq olinmagan."
-                                  className="w-10 h-10 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black flex items-center justify-center text-sm shadow-sm shadow-purple-600/30 transition-transform active:scale-95 cursor-pointer select-none"
-                                >
-                                  Y
-                                </button>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={(e) => handleCellClick(e, student, day, false)}
+                                  onClick={(e) => handleCellClick(e, student, day)}
                                   title={
                                     status === 'present'
                                       ? `${student.fullName}: Bor (Keldi) - o'zgartirish uchun bosing`
@@ -870,7 +787,7 @@ function AttendanceContent() {
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <Info className="w-4 h-4 text-[#003b95] shrink-0" />
               <span>
-                Davomat qo&apos;yish: Katakchani bosing va <strong>Yashil (Bor ✓)</strong> yoki <strong>Qizil (Yo&apos;q ✕)</strong> ni tanlang. Oldingi dars to&apos;liq olinmasa, keyingi darslar avtomatik ravishda <strong>Siyohrang (Y - Yopiq)</strong> bo&apos;lib saqlanadi.
+                Davomat qo&apos;yish: Katakchani bosing va <strong>Yashil (Bor ✓)</strong> yoki <strong>Qizil (Yo&apos;q ✕)</strong> ni tanlang. Ustun tepasidagi <strong>&ldquo;✓ Barchasi&rdquo;</strong> orqali barchaga tezkor davomat qo&apos;yishingiz mumkin.
               </span>
             </div>
 
