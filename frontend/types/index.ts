@@ -11,6 +11,7 @@ export interface Group {
   time: string;
   days: string;
   room: string;
+  monthlyPrice?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -21,6 +22,9 @@ export interface Student {
   phone: string;
   groupId: string | Group;
   missedLessonsCount: number;
+  discount?: number;
+  discountReason?: string;
+  paymentStatus?: 'paid' | 'unpaid';
   status: 'active' | 'archived';
   createdAt?: string;
   updatedAt?: string;
@@ -38,6 +42,7 @@ export interface AttendanceRecord {
   year: number;
   month: number; // 1-12
   days: AttendanceDay[];
+  isPaid?: boolean;
 }
 
 export interface DashboardStats {

@@ -20,10 +20,25 @@ const studentSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  discount: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  discountReason: {
+    type: String,
+    default: '',
+    trim: true,
+  },
   status: {
     type: String,
     enum: ['active', 'archived'],
     default: 'active',
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['paid', 'unpaid'], // To'ladi, To'lamadi
+    default: 'unpaid',
   },
 }, { timestamps: true });
 

@@ -25,6 +25,7 @@ import {
   Edit2,
   Trash2,
   AlertTriangle,
+  Banknote,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -43,6 +44,7 @@ export default function GroupsPage() {
     time: '',
     days: '',
     room: '',
+    monthlyPrice: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -56,6 +58,7 @@ export default function GroupsPage() {
     time: '',
     days: '',
     room: '',
+    monthlyPrice: '',
   });
   const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
   const [isUpdating, setIsUpdating] = useState(false);
@@ -124,6 +127,7 @@ export default function GroupsPage() {
         days: formData.days.trim(),
         time: formData.time.trim(),
         room: formData.room.trim(),
+        monthlyPrice: formData.monthlyPrice ? Number(formData.monthlyPrice) : 0,
       });
 
       toast.success('Yangi guruh muvaffaqiyatli qo\'shildi!');
@@ -136,6 +140,7 @@ export default function GroupsPage() {
         time: '',
         days: '',
         room: '',
+        monthlyPrice: '',
       });
       setFormErrors({});
     } catch (err: unknown) {
@@ -158,6 +163,7 @@ export default function GroupsPage() {
       time: group.time,
       days: group.days,
       room: group.room,
+      monthlyPrice: group.monthlyPrice ? String(group.monthlyPrice) : '',
     });
     setEditFormErrors({});
     setIsEditModalOpen(true);
@@ -181,6 +187,7 @@ export default function GroupsPage() {
         days: editFormData.days.trim(),
         time: editFormData.time.trim(),
         room: editFormData.room.trim(),
+        monthlyPrice: editFormData.monthlyPrice ? Number(editFormData.monthlyPrice) : 0,
       });
 
       toast.success('Guruh ma\'lumotlari muvaffaqiyatli yangilandi!');
@@ -387,6 +394,21 @@ export default function GroupsPage() {
                     <span className="font-medium text-slate-700">Vaqti:</span>
                     <span className="text-slate-900 font-medium">{group.time}</span>
                   </div>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                    <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-slate-700">Oylik to&apos;lov:</span>
+                    <span className="text-emerald-700 font-bold">
+                      {group.monthlyPrice && group.monthlyPrice > 0
+                        ? `${Number(group.monthlyPrice).toLocaleString()} so'm`
+                        : "Kiritilmagan"}
+                    </span>
+                    {group.monthlyPrice && group.monthlyPrice > 0 ? (
+                      <span className="text-[10px] text-slate-400">
+                        (~{Math.round(group.monthlyPrice / 12).toLocaleString()} so&apos;m/dars)
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -493,6 +515,16 @@ export default function GroupsPage() {
             />
           </div>
 
+          <Input
+            label="Oylik Kurs Narxi (so'mda)"
+            placeholder="Masalan: 450000"
+            type="number"
+            value={formData.monthlyPrice}
+            onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })}
+            leftIcon={<Banknote className="w-4 h-4 text-emerald-600" />}
+            helperText="Standart: 1 oyda 12 ta dars hisoblanadi (oylik to'lov / 12 = 1 dars narxi)"
+          />
+
           <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-6">
             <Button
               type="button"
@@ -586,6 +618,16 @@ export default function GroupsPage() {
               leftIcon={<MapPin className="w-4 h-4" />}
             />
           </div>
+
+          <Input
+            label="Oylik Kurs Narxi (so'mda)"
+            placeholder="Masalan: 450000"
+            type="number"
+            value={editFormData.monthlyPrice}
+            onChange={(e) => setEditFormData({ ...editFormData, monthlyPrice: e.target.value })}
+            leftIcon={<Banknote className="w-4 h-4 text-emerald-600" />}
+            helperText="Standart: 1 oyda 12 ta dars hisoblanadi (oylik to'lov / 12 = 1 dars narxi)"
+          />
 
           <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-6">
             <Button

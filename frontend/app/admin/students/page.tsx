@@ -24,6 +24,11 @@ import {
   UserX,
   Calendar,
   Layers,
+  Banknote,
+  Edit2,
+  Tag,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -51,8 +56,26 @@ function StudentsContent() {
     fullName: '',
     phone: '',
     groupId: initialGroupId,
+    discount: '',
+    discountReason: '',
+    paymentStatus: 'unpaid' as 'paid' | 'unpaid',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // O'quvchini tahrirlash (Edit) modali
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    fullName: '',
+    phone: '',
+    groupId: '',
+    discount: '',
+    discountReason: '',
+    paymentStatus: 'unpaid' as 'paid' | 'unpaid',
+  });
+  const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
+  const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+  const [isTogglingPayment, setIsTogglingPayment] = useState<string | null>(null);
 
   // Statusni o'zgartirish (arxivlash / tiklash) modali
   const [statusModal, setStatusModal] = useState<{
@@ -65,6 +88,11 @@ function StudentsContent() {
     targetStatus: 'archived',
   });
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // O'quvchini butunlay o'chirish (Delete) modali
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [isDeletingStudent, setIsDeletingStudent] = useState(false);
 
   // Guruhlarni yuklash
   const fetchGroups = useCallback(async () => {
@@ -151,11 +179,21 @@ function StudentsContent() {
         fullName: formData.fullName.trim(),
         phone: formData.phone.trim(),
         groupId: formData.groupId,
+        discount: formData.discount ? Number(formData.discount) : 0,
+        discountReason: formData.discountReason.trim(),
+        paymentStatus: formData.paymentStatus,
       });
 
       toast.success('Yangi o\'quvchi muvaffaqiyatli qo\'shildi!');
       setIsAddModalOpen(false);
-      setFormData({ fullName: '', phone: '', groupId: '' });
+      setFormData({
+        fullName: '',
+        phone: '',
+        groupId: '',
+        discount: '',
+        discountReason: '',
+        paymentStatus: 'unpaid',
+      });
       setFormErrors({});
       fetchStudents();
     } catch (err: unknown) {
@@ -166,6 +204,112 @@ function StudentsContent() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // O'quvchini tahrirlash modalini ochish
+  const handleOpenEditModal = (student: Student) => {
+    setEditingStudent(student);
+    const gId =
+      typeof student.groupId === 'object' && student.groupId !== null
+        ? (student.groupId as Group)._id
+        : (student.groupId as string) || '';
+    setEditFormData({
+      fullName: student.fullName,
+      phone: student.phone,
+      groupId: gId,
+      discount: student.discount !== undefined && student.discount > 0 ? String(student.discount) : '',
+      discountReason: student.discountReason || '',
+      paymentStatus: student.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+    });
+    setEditFormErrors({});
+    setIsEditModalOpen(true);
+  };
+
+  // O'quvchini yangilash
+  const handleUpdateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+
+    const errors: Record<string, string> = {};
+    if (!editFormData.fullName.trim()) errors.fullName = 'O\'quvchi F.I.Sh kiritilishi shart';
+    if (!editFormData.phone.trim()) errors.phone = 'Telefon raqami kiritilishi shart';
+    if (!editFormData.groupId) errors.groupId = 'Guruhni tanlash shart';
+    setEditFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    try {
+      setIsUpdatingStudent(true);
+      await api.put(`/admin/students/${editingStudent._id}`, {
+        fullName: editFormData.fullName.trim(),
+        phone: editFormData.phone.trim(),
+        groupId: editFormData.groupId,
+        discount: editFormData.discount ? Number(editFormData.discount) : 0,
+        discountReason: editFormData.discountReason.trim(),
+        paymentStatus: editFormData.paymentStatus,
+      });
+
+      toast.success('O\'quvchi ma\'lumotlari muvaffaqiyatli yangilandi!');
+      setIsEditModalOpen(false);
+      setEditingStudent(null);
+      fetchStudents();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'O\'quvchini yangilashda xatolik yuz berdi';
+      toast.error(errorMsg);
+    } finally {
+      setIsUpdatingStudent(false);
+    }
+  };
+
+  // To'lov holatini bitta bosish bilan almashtirish (To'ladi <-> To'lamadi)
+  const handleTogglePayment = async (studentId: string, currentStatus?: string) => {
+    try {
+      setIsTogglingPayment(studentId);
+      const res = await api.put(`/admin/students/${studentId}/payment`);
+      const newStatus = res.data.paymentStatus;
+      toast.success(
+        newStatus === 'paid' ? 'To\'lov qabul qilindi (To\'ladi)' : 'To\'lov bekor qilindi (To\'lamadi)'
+      );
+      setActiveStudents((prev) =>
+        prev.map((s) => (s._id === studentId ? { ...s, paymentStatus: newStatus } : s))
+      );
+      setArchivedStudents((prev) =>
+        prev.map((s) => (s._id === studentId ? { ...s, paymentStatus: newStatus } : s))
+      );
+    } catch (err: unknown) {
+      console.error('To\'lov holatini o\'zgartirishda xatolik:', err);
+      toast.error('To\'lov holatini o\'zgartirishda xatolik yuz berdi');
+    } finally {
+      setIsTogglingPayment(null);
+    }
+  };
+
+  // O'quvchi to'lovini hisoblash (1 oyda 12 dars qoidasi bo'yicha)
+  const calculateStudentFee = (student: Student) => {
+    const groupObj =
+      typeof student.groupId === 'object' && student.groupId !== null
+        ? (student.groupId as Group)
+        : groups.find((g) => g._id === student.groupId);
+
+    const monthlyPrice = groupObj?.monthlyPrice || 0;
+    const discount = student.discount || 0;
+    const netBasePrice = Math.max(0, monthlyPrice - discount);
+
+    // 1 oyda 12 ta dars qoidasi
+    const lessonPrice = netBasePrice / 12;
+    const missed = student.missedLessonsCount || 0;
+    const finalPayment = Math.max(0, Math.round(netBasePrice - missed * lessonPrice));
+
+    return {
+      monthlyPrice,
+      discount,
+      netBasePrice,
+      lessonPrice,
+      missed,
+      finalPayment,
+      hasPrice: Boolean(monthlyPrice && monthlyPrice > 0),
+    };
   };
 
   // Statusni o'zgartirish (arxivlash / qayta tiklash)
@@ -192,6 +336,27 @@ function StudentsContent() {
       toast.error(errorMsg);
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  // O'quvchini butunlay o'chirish (Delete)
+  const handleDeleteStudent = async () => {
+    if (!studentToDelete) return;
+
+    try {
+      setIsDeletingStudent(true);
+      await api.delete(`/admin/students/${studentToDelete._id}`);
+      toast.success('O\'quvchi va uning barcha ma\'lumotlari o\'chirildi');
+      setIsDeleteModalOpen(false);
+      setStudentToDelete(null);
+      fetchStudents();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'O\'quvchini o\'chirishda xatolik yuz berdi';
+      toast.error(errorMsg);
+    } finally {
+      setIsDeletingStudent(false);
     }
   };
 
@@ -353,6 +518,7 @@ function StudentsContent() {
                   <th className="py-4 px-6">Telefon Raqami</th>
                   <th className="py-4 px-6">Biriktirilgan Guruh</th>
                   <th className="py-4 px-6 text-center">Qoldirgan Darslari</th>
+                  <th className="py-4 px-6 text-center">To&apos;lov Summasi</th>
                   <th className="py-4 px-6 text-center">Holati</th>
                   <th className="py-4 px-6 text-right">Amallar</th>
                 </tr>
@@ -363,6 +529,7 @@ function StudentsContent() {
                     typeof student.groupId === 'object' && student.groupId !== null
                       ? (student.groupId as Group)
                       : null;
+                  const fee = calculateStudentFee(student);
 
                   return (
                     <tr
@@ -437,6 +604,57 @@ function StudentsContent() {
                         </span>
                       </td>
 
+                      {/* To'lov Summasi */}
+                      <td className="py-4 px-6 text-center">
+                        <div className="flex flex-col items-center">
+                          {fee.hasPrice ? (
+                            <>
+                              <span className="font-extrabold text-slate-900 text-sm">
+                                {fee.finalPayment.toLocaleString()} so&apos;m
+                              </span>
+                              {fee.discount > 0 && (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-0.5 border border-emerald-200/60"
+                                  title={student.discountReason || "Chegirma"}
+                                >
+                                  -{fee.discount.toLocaleString()} so&apos;m
+                                  {student.discountReason ? ` (${student.discountReason})` : ' skidka'}
+                                </span>
+                              )}
+                              {fee.missed > 0 && (
+                                <span className="text-[10px] text-rose-500 font-medium mt-0.5">
+                                  (-{Math.round(fee.missed * fee.lessonPrice).toLocaleString()} so&apos;m qoldirilgan)
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic mb-1">
+                              Narx kiritilmagan
+                            </span>
+                          )}
+
+                          {/* To'ladi / To'lamadi tugmasi */}
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePayment(student._id, student.paymentStatus)}
+                            disabled={isTogglingPayment === student._id}
+                            title="To'lov holatini o'zgartirish uchun bosing (To'ladi / To'lamadi)"
+                            className={`mt-1.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black cursor-pointer transition-all active:scale-95 shadow-2xs border ${
+                              student.paymentStatus === 'paid'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
+                            }`}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                student.paymentStatus === 'paid' ? 'bg-emerald-500' : 'bg-rose-500'
+                              }`}
+                            />
+                            <span>{student.paymentStatus === 'paid' ? "To'ladi" : "To'lamadi"}</span>
+                          </button>
+                        </div>
+                      </td>
+
                       {/* Status */}
                       <td className="py-4 px-6 text-center">
                         <Badge
@@ -449,39 +667,60 @@ function StudentsContent() {
 
                       {/* Amallar */}
                       <td className="py-4 px-6 text-right">
-                        {student.status === 'active' ? (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="text-xs text-slate-600 hover:text-rose-600 hover:border-rose-200"
-                            onClick={() =>
-                              setStatusModal({
-                                isOpen: true,
-                                student,
-                                targetStatus: 'archived',
-                              })
-                            }
-                            leftIcon={<UserX className="w-3.5 h-3.5" />}
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(student)}
+                            className="p-1.5 text-slate-400 hover:text-[#003b95] hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="O'quvchi ma'lumotlari va chegirmasini tahrirlash"
                           >
-                            Arxivlash
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="text-xs text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200"
-                            onClick={() =>
-                              setStatusModal({
-                                isOpen: true,
-                                student,
-                                targetStatus: 'active',
-                              })
-                            }
-                            leftIcon={<UserCheck className="w-3.5 h-3.5" />}
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          {student.status === 'active' ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="text-xs text-slate-600 hover:text-rose-600 hover:border-rose-200"
+                              onClick={() =>
+                                setStatusModal({
+                                  isOpen: true,
+                                  student,
+                                  targetStatus: 'archived',
+                                })
+                              }
+                              leftIcon={<UserX className="w-3.5 h-3.5" />}
+                            >
+                              Arxivlash
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="text-xs text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200"
+                              onClick={() =>
+                                setStatusModal({
+                                  isOpen: true,
+                                  student,
+                                  targetStatus: 'active',
+                                })
+                              }
+                              leftIcon={<UserCheck className="w-3.5 h-3.5" />}
+                            >
+                              Faollashtirish
+                            </Button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStudentToDelete(student);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="O'quvchini butunlay o'chirish"
                           >
-                            Faollashtirish
-                          </Button>
-                        )}
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -536,6 +775,34 @@ function StudentsContent() {
             ))}
           </Select>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Chegirma / Skidka (so'm)"
+              placeholder="Masalan: 25000"
+              type="number"
+              value={formData.discount}
+              onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+              leftIcon={<Tag className="w-4 h-4 text-emerald-600" />}
+              helperText="Masalan: 1 oiladan 2 kishi kelganda"
+            />
+
+            <Input
+              label="Chegirma Sababi"
+              placeholder="Masalan: Bitta uydan 2 kishi"
+              value={formData.discountReason}
+              onChange={(e) => setFormData({ ...formData, discountReason: e.target.value })}
+            />
+          </div>
+
+          <Select
+            label="To'lov Holati"
+            value={formData.paymentStatus}
+            onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value as 'paid' | 'unpaid' })}
+          >
+            <option value="unpaid">To&apos;lamadi (Kutilmoqda)</option>
+            <option value="paid">To&apos;ladi (To&apos;langan)</option>
+          </Select>
+
           <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-6">
             <Button
               type="button"
@@ -556,6 +823,105 @@ function StudentsContent() {
               leftIcon={<CheckCircle2 className="w-4 h-4" />}
             >
               O&apos;quvchini Saqlash
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* O'quvchini Tahrirlash (Edit) Modali */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+          setEditFormErrors({});
+        }}
+        title="O'quvchi Ma'lumotlarini Tahrirlash"
+        description="F.I.Sh, telefon, guruh va shaxsiy chegirma (skidka)ni o'zgartirish"
+        maxWidth="md"
+      >
+        <form onSubmit={handleUpdateStudent} className="space-y-4">
+          <Input
+            label="O'quvchi F.I.Sh *"
+            placeholder="Masalan: Rustamov Anvar Alisher o'g'li"
+            value={editFormData.fullName}
+            onChange={(e) => setEditFormData({ ...editFormData, fullName: e.target.value })}
+            error={editFormErrors.fullName}
+          />
+
+          <Input
+            label="Telefon Raqami *"
+            placeholder="+998 90 123 45 67"
+            value={editFormData.phone}
+            onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+            error={editFormErrors.phone}
+            leftIcon={<Phone className="w-4 h-4" />}
+          />
+
+          <Select
+            label="Biriktirilgan Guruh *"
+            value={editFormData.groupId}
+            onChange={(e) => setEditFormData({ ...editFormData, groupId: e.target.value })}
+            error={editFormErrors.groupId}
+            placeholder="Guruhni tanlang"
+          >
+            <option value="">-- Guruhni tanlang --</option>
+            {groups.map((g) => (
+              <option key={g._id} value={g._id}>
+                {g.name} - {g.subject} ({g.teacherName})
+              </option>
+            ))}
+          </Select>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Chegirma / Skidka (so'm)"
+              placeholder="Masalan: 25000"
+              type="number"
+              value={editFormData.discount}
+              onChange={(e) => setEditFormData({ ...editFormData, discount: e.target.value })}
+              leftIcon={<Tag className="w-4 h-4 text-emerald-600" />}
+              helperText="Masalan: 1 oiladan 2 kishi kelganda"
+            />
+
+            <Input
+              label="Chegirma Sababi"
+              placeholder="Masalan: Bitta uydan 2 kishi"
+              value={editFormData.discountReason}
+              onChange={(e) => setEditFormData({ ...editFormData, discountReason: e.target.value })}
+            />
+          </div>
+
+          <Select
+            label="To'lov Holati"
+            value={editFormData.paymentStatus}
+            onChange={(e) => setEditFormData({ ...editFormData, paymentStatus: e.target.value as 'paid' | 'unpaid' })}
+          >
+            <option value="unpaid">To&apos;lamadi (Kutilmoqda)</option>
+            <option value="paid">To&apos;ladi (To&apos;langan)</option>
+          </Select>
+
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-6">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setIsEditModalOpen(false);
+                setEditingStudent(null);
+                setEditFormErrors({});
+              }}
+              disabled={isUpdatingStudent}
+            >
+              Bekor qilish
+            </Button>
+
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isUpdatingStudent}
+              leftIcon={<CheckCircle2 className="w-4 h-4" />}
+            >
+              O&apos;zgarishlarni Saqlash
             </Button>
           </div>
         </form>
@@ -605,6 +971,57 @@ function StudentsContent() {
               isLoading={isUpdatingStatus}
             >
               {statusModal.targetStatus === 'archived' ? 'Arxivlash' : 'Faollashtirish'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* O'quvchini butunlay o'chirishni tasdiqlash modali */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          if (!isDeletingStudent) {
+            setIsDeleteModalOpen(false);
+            setStudentToDelete(null);
+          }
+        }}
+        title="O'quvchini butunlay o'chirish"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-800">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="text-xs sm:text-sm leading-relaxed">
+              <p className="font-bold text-rose-900">
+                &ldquo;{studentToDelete?.fullName}&rdquo; o&apos;quvchisini bazadan butunlay o&apos;chirmoqchimisiz?
+              </p>
+              <p className="text-slate-600 mt-1 text-xs">
+                Ushbu amal ortga qaytarilmaydi. O&apos;quvchiga tegishli barcha davomat yozuvlari ham bazadan tozalab tashlanadi. Agar o&apos;quvchi kursni vaqtincha to&apos;xtatgan bo&apos;lsa, o&apos;chirish o&apos;rniga <strong>Arxivlash</strong> tavsiya etiladi.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setStudentToDelete(null);
+              }}
+              disabled={isDeletingStudent}
+            >
+              Bekor qilish
+            </Button>
+
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleDeleteStudent}
+              isLoading={isDeletingStudent}
+              leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+            >
+              Ha, Butunlay O&apos;chirish
             </Button>
           </div>
         </div>

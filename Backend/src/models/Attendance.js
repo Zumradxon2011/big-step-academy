@@ -27,6 +27,10 @@ const attendanceSchema = new mongoose.Schema({
       default: 'present',
     },
   }],
+  isPaid: {
+    type: Boolean,
+    default: false, // Shu oy uchun to'lov qilinganmi
+  },
 }, { timestamps: true });
 
 // Bir o'quvchining bir oy uchun faqat bitta davomat varaqasi bo'lishini ta'minlaymiz

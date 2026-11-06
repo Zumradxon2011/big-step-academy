@@ -46,6 +46,9 @@ const saveAttendance = async (req, res) => {
 
         if (attendance) {
           attendance.days = days;
+          if (record.isPaid !== undefined) {
+            attendance.isPaid = record.isPaid;
+          }
           await attendance.save();
         } else {
           attendance = await Attendance.create({
@@ -54,6 +57,7 @@ const saveAttendance = async (req, res) => {
             year: Number(year),
             month: Number(month),
             days,
+            isPaid: record.isPaid !== undefined ? record.isPaid : false,
           });
         }
 
@@ -79,6 +83,9 @@ const saveAttendance = async (req, res) => {
 
     if (attendance) {
       attendance.days = days;
+      if (req.body.isPaid !== undefined) {
+        attendance.isPaid = req.body.isPaid;
+      }
       await attendance.save();
     } else {
       attendance = await Attendance.create({
@@ -87,6 +94,7 @@ const saveAttendance = async (req, res) => {
         year: Number(year),
         month: Number(month),
         days,
+        isPaid: req.body.isPaid !== undefined ? req.body.isPaid : false,
       });
     }
 
@@ -100,7 +108,47 @@ const saveAttendance = async (req, res) => {
   }
 };
 
+// Muayyan oy uchun to'lov holatini almashtirish (To'ladi <-> To'lamadi)
+const toggleMonthPayment = async (req, res) => {
+  try {
+    const { studentId, groupId, year, month } = req.body;
+    if (!studentId || !groupId || !year || !month) {
+      return res.status(400).json({ message: "Student, guruh, yil va oy ko'rsatilishi shart" });
+    }
+
+    let attendance = await Attendance.findOne({
+      student: studentId,
+      group: groupId,
+      year: Number(year),
+      month: Number(month),
+    });
+
+    if (attendance) {
+      attendance.isPaid = !attendance.isPaid;
+      await attendance.save();
+    } else {
+      attendance = await Attendance.create({
+        student: studentId,
+        group: groupId,
+        year: Number(year),
+        month: Number(month),
+        days: [],
+        isPaid: true,
+      });
+    }
+
+    res.json({
+      message: `To'lov holati "${attendance.isPaid ? "To'ladi" : "To'lamadi"}" deb belgilandi`,
+      isPaid: attendance.isPaid,
+      attendance,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getAttendanceByMonth,
   saveAttendance,
+  toggleMonthPayment,
 };

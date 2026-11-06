@@ -26,6 +26,11 @@ const groupSchema = new mongoose.Schema({
     type: String,
     required: true, // Masalan: "Xona 301"
   },
+  monthlyPrice: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Group', groupSchema);

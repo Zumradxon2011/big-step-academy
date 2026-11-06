@@ -102,6 +102,8 @@ function AttendanceContent() {
   const [attendanceMap, setAttendanceMap] = useState<
     Record<string, Record<number, 'present' | 'absent'>>
   >({});
+  const [paymentMap, setPaymentMap] = useState<Record<string, boolean>>({});
+  const [togglingPaymentStudentId, setTogglingPaymentStudentId] = useState<string | null>(null);
 
   // Interaktiv Popover holati (Yashil - Bor va Qizil - Yo'q tanlash)
   const [popoverState, setPopoverState] = useState<PopoverState | null>(null);
@@ -195,11 +197,13 @@ function AttendanceContent() {
 
       const records: AttendanceRecord[] = attendanceRes.data || [];
 
-      // Attendance map shakllantirish (faqat 'present' va 'absent')
+      // Attendance map va Payment map shakllantirish
       const newMap: Record<string, Record<number, 'present' | 'absent'>> = {};
+      const newPaymentMap: Record<string, boolean> = {};
 
       fetchedStudents.forEach((student) => {
         newMap[student._id] = {};
+        newPaymentMap[student._id] = student.paymentStatus === 'paid';
       });
 
       records.forEach((record) => {
@@ -208,17 +212,23 @@ function AttendanceContent() {
             ? (record.student as Student)._id
             : (record.student as string);
 
-        if (studentId && record.days && Array.isArray(record.days)) {
-          if (!newMap[studentId]) newMap[studentId] = {};
-          record.days.forEach((d) => {
-            if (d.status === 'present' || d.status === 'absent') {
-              newMap[studentId][d.date] = d.status;
-            }
-          });
+        if (studentId) {
+          if (record.isPaid !== undefined) {
+            newPaymentMap[studentId] = record.isPaid;
+          }
+          if (record.days && Array.isArray(record.days)) {
+            if (!newMap[studentId]) newMap[studentId] = {};
+            record.days.forEach((d) => {
+              if (d.status === 'present' || d.status === 'absent') {
+                newMap[studentId][d.date] = d.status;
+              }
+            });
+          }
         }
       });
 
       setAttendanceMap(newMap);
+      setPaymentMap(newPaymentMap);
     } catch (err) {
       console.error('Davomat ma\'lumotlarini olishda xatolik:', err);
       toast.error('Davomat ma\'lumotlarini yuklashda xatolik');
@@ -226,6 +236,37 @@ function AttendanceContent() {
       setIsLoadingData(false);
     }
   }, [selectedGroupId, selectedYear, selectedMonth]);
+
+  // Muayyan oy uchun to'lov holatini almashtirish (To'ladi <-> To'lamadi)
+  const handleToggleMonthPayment = async (student: Student) => {
+    if (!selectedGroupId) return;
+    try {
+      setTogglingPaymentStudentId(student._id);
+      const res = await api.put('/admin/attendance/payment', {
+        studentId: student._id,
+        groupId: selectedGroupId,
+        year: selectedYear,
+        month: selectedMonth,
+      });
+
+      const newIsPaid = res.data.isPaid;
+      setPaymentMap((prev) => ({
+        ...prev,
+        [student._id]: newIsPaid,
+      }));
+
+      toast.success(
+        newIsPaid
+          ? `${student.fullName}: To'lov qabul qilindi (To'ladi)`
+          : `${student.fullName}: To'lov bekor qilindi (To'lamadi)`
+      );
+    } catch (err) {
+      console.error('To\'lov holatini o\'zgartirishda xatolik:', err);
+      toast.error('To\'lov holatini saqlashda xatolik yuz berdi');
+    } finally {
+      setTogglingPaymentStudentId(null);
+    }
+  };
 
   useEffect(() => {
     fetchAttendanceData();
@@ -644,7 +685,7 @@ function AttendanceContent() {
                     );
                   })}
 
-                  {/* Oylik Xulosa ustunlari (Faqat Bor, Yo'q va Qatnashuv) */}
+                  {/* Oylik Xulosa ustunlari (Faqat Bor, Yo'q, Qatnashuv va To'lov) */}
                   <th className="py-4 px-3 text-center text-xs font-extrabold text-emerald-800 bg-emerald-50/70 min-w-[70px] border-l border-slate-200">
                     Bor
                   </th>
@@ -653,6 +694,9 @@ function AttendanceContent() {
                   </th>
                   <th className="py-4 px-3 text-center text-xs font-extrabold text-blue-900 bg-blue-50/70 min-w-[80px]">
                     Qatnashuv
+                  </th>
+                  <th className="py-4 px-4 text-center text-xs font-extrabold text-emerald-900 bg-emerald-100/60 min-w-[130px] border-l border-slate-200">
+                    To&apos;lov (so&apos;m)
                   </th>
                 </tr>
               </thead>
@@ -774,6 +818,66 @@ function AttendanceContent() {
                         >
                           {attendancePercent}%
                         </span>
+                      </td>
+
+                      {/* Shu oy uchun hisoblangan to'lov va to'lov holati */}
+                      <td className="py-3 px-3 text-center bg-emerald-50/20 border-l border-slate-200">
+                        <div className="flex flex-col items-center gap-1">
+                          {selectedGroup?.monthlyPrice && selectedGroup.monthlyPrice > 0 ? (
+                            (() => {
+                              const monthlyPrice = selectedGroup.monthlyPrice || 0;
+                              const discount = student.discount || 0;
+                              const netBase = Math.max(0, monthlyPrice - discount);
+                              const lessonCost = netBase / 12; // 1 oyda 12 ta dars qoidasi
+                              const finalFee = Math.max(0, Math.round(netBase - absentCount * lessonCost));
+
+                              return (
+                                <>
+                                  <span className="font-black text-slate-900 text-xs sm:text-sm whitespace-nowrap">
+                                    {finalFee.toLocaleString()} so&apos;m
+                                  </span>
+                                  {discount > 0 && (
+                                    <span
+                                      className="text-[9px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded-md"
+                                      title={student.discountReason || "Chegirma"}
+                                    >
+                                      -{discount.toLocaleString()} so&apos;m
+                                    </span>
+                                  )}
+                                  {absentCount > 0 && (
+                                    <span className="text-[9px] text-rose-500 font-semibold">
+                                      (-{Math.round(absentCount * lessonCost).toLocaleString()} so&apos;m yo&apos;q)
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-[11px] text-slate-400 italic">
+                              Narx kiritilmagan
+                            </span>
+                          )}
+
+                          {/* To'ladi / To'lamadi tugmasi */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleMonthPayment(student)}
+                            disabled={togglingPaymentStudentId === student._id}
+                            title="Shu oy uchun to'lov holatini almashtirish (To'ladi / To'lamadi)"
+                            className={`mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black cursor-pointer transition-all active:scale-95 shadow-2xs border ${
+                              paymentMap[student._id]
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
+                            }`}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                paymentMap[student._id] ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+                              }`}
+                            />
+                            <span>{paymentMap[student._id] ? "To'ladi" : "To'lamadi"}</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -12,11 +12,15 @@ const {
   getActiveStudents,
   getArchivedStudents,
   createStudent,
+  updateStudent,
+  toggleStudentPayment,
   updateStudentStatus,
+  deleteStudent,
 } = require('../controllers/adminController');
 const {
   getAttendanceByMonth,
   saveAttendance,
+  toggleMonthPayment,
 } = require('../controllers/attendanceController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -38,10 +42,14 @@ router.delete('/admin/groups/:id', protect, deleteGroup);
 router.get('/admin/students/active', protect, getActiveStudents);
 router.get('/admin/students/archive', protect, getArchivedStudents);
 router.post('/admin/students', protect, createStudent);
+router.put('/admin/students/:id', protect, updateStudent);
+router.put('/admin/students/:id/payment', protect, toggleStudentPayment);
 router.put('/admin/students/:id/status', protect, updateStudentStatus);
+router.delete('/admin/students/:id', protect, deleteStudent);
 
 // Himoyalangan Admin yo'llari (Davomat)
 router.get('/admin/attendance', protect, getAttendanceByMonth);
 router.post('/admin/attendance', protect, saveAttendance);
+router.put('/admin/attendance/payment', protect, toggleMonthPayment);
 
 module.exports = router;

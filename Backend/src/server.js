@@ -13,10 +13,29 @@ const app = express();
 // Middleware'lar
 app.use(express.json());
 app.use(cookieParser());
+
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true, // Cookie-larni qabul qilish uchun
+    origin: (origin, callback) => {
+      // Brauzersiz yoki serverdan so'rovlar (masalan curl, mobile, monitoring)
+      if (!origin) return callback(null, true);
+      // Ruxsat etilgan frontend domenlari yoki Vercel preview domenlari
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        (process.env.FRONTEND_URL && origin.startsWith(process.env.FRONTEND_URL))
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true, // Cross-domain cookie-lar uchun
   })
 );
 
