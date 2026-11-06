@@ -10,6 +10,9 @@ connectDB();
 
 const app = express();
 
+// Render / Vercel kabi reverse proxy ortida secure cookie-lar to'g'ri ishlashi uchun
+app.set('trust proxy', 1);
+
 // Middleware'lar
 app.use(express.json());
 app.use(cookieParser());
